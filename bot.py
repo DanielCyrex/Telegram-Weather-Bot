@@ -3,17 +3,10 @@ import time
 from telebot import types
 from telebot.types import Message, CallbackQuery
 import cityparser
+import sys
 
-
-TOKEN = '1132471195:AAEwdm4t5H5NgrUko9LGYRNyxF99WTdFimQ'
+TOKEN = 'Your token'
 STICKER_ID = 'CAACAgIAAxkBAAMjXsG_ocvu1dbBNCYaT8Lm3l9IfRMAAl0AA0QNzxfHvudczhgCPBkE'
-
-TEMPERATURE = None
-DESCRIPTION = None
-FEELS_LIKE = None
-PRESSURE = None
-HUMIDITY = None
-WIND = None
 
 bot = telebot.TeleBot(TOKEN)
 
@@ -36,20 +29,12 @@ def command_handler(message: Message) -> None:
 @bot.edited_message_handler(content_types=['text'])
 @bot.message_handler(content_types=['text'])
 def reply_to_message(message: Message) -> None:
-    keyboard = types.InlineKeyboardMarkup()
-    callback_button = types.InlineKeyboardButton(text="Детальнее", callback_data="test")
-    keyboard.add(callback_button)
+
     weather = cityparser.parse(message.text)
     if weather is None:
         send = "Прости, но я не знаю такого города 😢."
         bot.send_message(message.chat.id, send)
     else:
-        global TEMPERATURE
-        global DESCRIPTION
-        global FEELS_LIKE
-        global PRESSURE
-        global HUMIDITY
-        global WIND
         TEMPERATURE = weather[0]['temp']
         DESCRIPTION = weather[0]['description']
         FEELS_LIKE = weather[0]['feels like']
@@ -57,11 +42,16 @@ def reply_to_message(message: Message) -> None:
         HUMIDITY = weather[0]['humidity']
         WIND = weather[0]['wind']
         send = f'<u>Температура:</u> {TEMPERATURE}\n{DESCRIPTION}'
+        keyboard = types.InlineKeyboardMarkup()
+        callback_button = types.InlineKeyboardButton(text="Детальнее",
+                                                     callback_data=f'{FEELS_LIKE},{WIND},{HUMIDITY},{PRESSURE}')
+        keyboard.add(callback_button)
         bot.send_message(message.chat.id, send, parse_mode='html', reply_markup=keyboard)
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def detailed_weather(call: CallbackQuery) -> None:
+    [FEELS_LIKE, WIND, HUMIDITY, PRESSURE] = (call.data).split(',')
     detailed_send = f'Чувствуется как: <b>{FEELS_LIKE}С</b>\n' \
                     f'Скорость ветра: <b>{WIND} м/c</b>\n' \
                     f'Влажность: <b>{HUMIDITY}%</b>\n' \
@@ -72,9 +62,7 @@ def detailed_weather(call: CallbackQuery) -> None:
 if __name__ == '__main__':
     while True:
         try:
-            bot.polling(none_stop=True)
-        # ConnectionError and ReadTimeout because of possible timout of the requests library
-        # TypeError for moviepy errors
-        # maybe there are others, therefore Exception
-        except Exception:
+            bot.polling(none_stop=True, timeout=60)
+        except Exception as e:
+            print(e)
             time.sleep(15)
